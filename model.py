@@ -53,29 +53,24 @@ class MusicNoteClassifier(nn.Module):
     def __init__(self, num_notes=12, num_octaves=11):
         super(MusicNoteClassifier, self).__init__()
         
-        # Initial layers with increased capacity
         self.conv1 = nn.Conv2d(1, 128, kernel_size=7, stride=2, padding=3)
         self.bn1 = nn.BatchNorm2d(128)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.dropout1 = nn.Dropout2d(0.4)
         
-        # Residual blocks with attention
         self.layer1 = self._make_layer(128, 256, 3)
         self.layer2 = self._make_layer(256, 512, 3, stride=2)
         self.layer3 = self._make_layer(512, 1024, 3, stride=2)
         
         self.dropout = nn.Dropout(0.6)
         
-        # Calculate size after convolution layers
         self.fc_input_size = 1024 * 8 * 8
         
-        # Enhanced fully connected layers for note classification
         self.fc1 = nn.Linear(self.fc_input_size, 4096)
         self.fc2 = nn.Linear(4096, 2048)
         self.fc3 = nn.Linear(2048, 1024)
         self.fc4 = nn.Linear(1024, num_notes)
         
-        # Enhanced fully connected layers for octave classification
         self.fc1_octave = nn.Linear(self.fc_input_size, 2048)
         self.fc2_octave = nn.Linear(2048, 1024)
         self.fc3_octave = nn.Linear(1024, num_octaves)

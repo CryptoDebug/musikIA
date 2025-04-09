@@ -7,17 +7,14 @@ from tqdm import tqdm
 import os
 from data_preparation import create_data_loaders
 from model import MusicNoteClassifier
+import gc
 
 def train_model(model, train_loader, val_loader, num_epochs=1000, device='cuda'):
     model = model.to(device)
     
-    # Enhanced loss function with label smoothing
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-    
-    # Advanced optimizer with weight decay
     optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=0.01, betas=(0.9, 0.999))
     
-    # Combined learning rate schedulers
     scheduler1 = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, verbose=True)
     scheduler2 = CosineAnnealingWarmRestarts(optimizer, T_0=50, T_mult=2, eta_min=1e-6)
     
@@ -26,21 +23,22 @@ def train_model(model, train_loader, val_loader, num_epochs=1000, device='cuda')
     best_val_octave_acc = 0
     best_epoch = 0
     
-    # Create models directory if it doesn't exist
     os.makedirs('models', exist_ok=True)
     
-    # Early stopping parameters
     patience = 30
     counter = 0
     
     for epoch in range(num_epochs):
+
+        gc.collect()
+        torch.cuda.empty_cache()
+    
         model.train()
         train_loss = 0.0
         train_note_correct = 0
         train_octave_correct = 0
         total = 0
         
-        # Training loop with gradient clipping
         for batch in tqdm(train_loader, desc=f'Epoch {epoch+1}/{num_epochs} - Training'):
             spectrograms = batch['spectrogram'].to(device)
             note_labels = batch['note_label'].to(device)
@@ -48,9 +46,7 @@ def train_model(model, train_loader, val_loader, num_epochs=1000, device='cuda')
             
             optimizer.zero_grad()
             note_output, octave_output = model(spectrograms)
-            
-            # Enhanced loss weighting
-            note_loss = criterion(note_output, note_labels) * 8.0  # Increased weight for notes
+            note_loss = criterion(note_output, note_labels) * 8.0
             octave_loss = criterion(octave_output, octave_labels)
             loss = note_loss + octave_loss
             
@@ -65,6 +61,9 @@ def train_model(model, train_loader, val_loader, num_epochs=1000, device='cuda')
             train_note_correct += (note_pred == note_labels).sum().item()
             train_octave_correct += (octave_pred == octave_labels).sum().item()
             total += note_labels.size(0)
+
+            del spectrograms, note_labels, octave_labels, note_output, octave_output, loss
+            torch.cuda.empty_cache()
         
         train_loss = train_loss / len(train_loader)
         train_note_acc = 100 * train_note_correct / total
@@ -96,6 +95,9 @@ def train_model(model, train_loader, val_loader, num_epochs=1000, device='cuda')
                 val_note_correct += (note_pred == note_labels).sum().item()
                 val_octave_correct += (octave_pred == octave_labels).sum().item()
                 total += note_labels.size(0)
+
+                del spectrograms, note_labels, octave_labels, note_output, octave_output, loss
+                torch.cuda.empty_cache()
         
         val_loss = val_loss / len(val_loader)
         val_note_acc = 100 * val_note_correct / total
@@ -106,11 +108,10 @@ def train_model(model, train_loader, val_loader, num_epochs=1000, device='cuda')
         print(f'Val Loss: {val_loss:.4f}, Val Note Acc: {val_note_acc:.2f}%, Val Octave Acc: {val_octave_acc:.2f}%')
         print(f'Learning Rate: {optimizer.param_groups[0]["lr"]:.6f}')
         
-        # Update learning rate
         scheduler1.step(val_loss)
         scheduler2.step()
         
-        # Save best model
+        # best model
         if val_note_acc > best_val_note_acc or val_octave_acc > best_val_octave_acc:
             if val_note_acc > best_val_note_acc:
                 best_val_note_acc = val_note_acc
@@ -133,7 +134,6 @@ def train_model(model, train_loader, val_loader, num_epochs=1000, device='cuda')
         else:
             counter += 1
         
-        # Early stopping
         if counter >= patience:
             print(f"Early stopping triggered after {epoch+1} epochs")
             break
@@ -155,7 +155,6 @@ def main():
     
     train_model(model, train_loader, val_loader, device=device)
     
-    # Save encoders in models directory
     os.makedirs('models', exist_ok=True)
     import joblib
     joblib.dump(note_encoder, 'models/note_encoder.pkl')

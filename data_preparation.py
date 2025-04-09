@@ -14,18 +14,22 @@ class MusicNoteDataset(Dataset):
         self.note_encoder = LabelEncoder()
         self.octave_encoder = LabelEncoder()
         
-        for octave in range(11):
-            octave_dir = os.path.join(root_dir, f"Octave {octave}")
-            if not os.path.exists(octave_dir):
+        octave_dirs = [d for d in os.listdir(root_dir) if d.startswith("Octave ")]
+        
+        for octave_dir in octave_dirs:
+            full_path = os.path.join(root_dir, octave_dir)
+            if not os.path.isdir(full_path):
                 continue
+            
+            octave = int(octave_dir.split(" ")[1])
                 
-            for filename in os.listdir(octave_dir):
+            for filename in os.listdir(full_path):
                 if filename.endswith(".wav"):
                     note_name = filename.split(".")[0]
                     self.samples.append({
-                        'path': os.path.join(octave_dir, filename),
+                        'path': os.path.join(full_path, filename),
                         'note': note_name[:-1],
-                        'octave': int(note_name[-1])
+                        'octave': octave
                     })
         
         self.note_encoder.fit([sample['note'] for sample in self.samples])
