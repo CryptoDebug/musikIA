@@ -10,7 +10,7 @@ from model import MusicNoteClassifier, FocalLoss
 import gc
 from colorama import Fore, Style
 
-def train_model(model, train_loader, val_loader, num_epochs=500, device='cuda'):
+def train_model(model, train_loader, val_loader, num_epochs=400, device='cuda'):
     model = model.to(device)
     note_criterion = FocalLoss(alpha=0.25, gamma=2.0)
     octave_criterion = FocalLoss(alpha=0.25, gamma=2.0)
@@ -21,7 +21,7 @@ def train_model(model, train_loader, val_loader, num_epochs=500, device='cuda'):
     best_epoch = 0
     best_model_path = None
     os.makedirs('models', exist_ok=True)
-    patience = 100
+    patience = 50
     counter = 0
     
     print(f"\n{Fore.CYAN}Début de l'entraînement{Style.RESET_ALL}")

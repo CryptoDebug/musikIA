@@ -6,10 +6,11 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.preprocessing import LabelEncoder
 
 class MusicNoteDataset(Dataset):
-    def __init__(self, root_dir, transform=None, target_length=128):
+    def __init__(self, root_dir, transform=None, target_length=128, mode='both'):
         self.root_dir = root_dir
         self.transform = transform
         self.target_length = target_length
+        self.mode = mode  # 'both', 'note', 'octave'
         self.samples = []
         self.note_encoder = LabelEncoder()
         self.octave_encoder = LabelEncoder()
@@ -76,17 +77,28 @@ class MusicNoteDataset(Dataset):
         assert note_label < len(self.note_encoder.classes_), f"Label de note invalide: {note_label}"
         assert octave_label < len(self.octave_encoder.classes_), f"Label d'octave invalide: {octave_label}"
         
-        return {
-            'spectrogram': mel_spec_tensor,
-            'note_label': torch.LongTensor([note_label])[0],
-            'octave_label': torch.LongTensor([octave_label])[0]
-        }
+        if self.mode == 'note':
+            return {
+                'spectrogram': mel_spec_tensor,
+                'note_label': torch.LongTensor([note_label])[0]
+            }
+        elif self.mode == 'octave':
+            return {
+                'spectrogram': mel_spec_tensor,
+                'octave_label': torch.LongTensor([octave_label])[0]
+            }
+        else:
+            return {
+                'spectrogram': mel_spec_tensor,
+                'note_label': torch.LongTensor([note_label])[0],
+                'octave_label': torch.LongTensor([octave_label])[0]
+            }
     
     def get_encoders(self):
         return self.note_encoder, self.octave_encoder
 
-def create_data_loaders(root_dir, batch_size=32, train_split=0.8, target_length=128):
-    dataset = MusicNoteDataset(root_dir, target_length=target_length)
+def create_data_loaders(root_dir, batch_size=32, train_split=0.8, target_length=128, mode='both'):
+    dataset = MusicNoteDataset(root_dir, target_length=target_length, mode=mode)
     
     indices = list(range(len(dataset)))
     np.random.shuffle(indices)
